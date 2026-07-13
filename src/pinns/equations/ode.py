@@ -242,13 +242,6 @@ class PendulumODE(ODE):
         return {"t": t.requires_grad_(True)}
 
 
-from ..registry import register_equation
-register_equation("exponential_decay", ExponentialDecayODE)
-register_equation("logistic", LogisticODE)
-register_equation("harmonic_oscillator", HarmonicOscillatorODE)
-register_equation("pendulum", PendulumODE)
-
-
 __all__ = [
     "ExponentialDecayODE",
     "LogisticODE",

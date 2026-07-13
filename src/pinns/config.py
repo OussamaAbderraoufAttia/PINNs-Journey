@@ -1,256 +1,205 @@
 """
 Configuration Management
 
-Provides structured configuration with validation using Hydra/OmegaConf.
-Supports YAML configs, CLI overrides, and environment variables.
+YAML-based configuration with dataclass support.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+import yaml
+from dataclasses import dataclass, asdict, fields
+from typing import Dict, Any, Optional
 from pathlib import Path
-import omegaconf
-from omegaconf import DictConfig, OmegaConf
 
 
 @dataclass
 class ModelConfig:
-    """Neural network architecture configuration."""
-    hidden_layers: List[int] = field(default_factory=lambda: [64, 64, 64, 64])
-    activation: str = "tanh"  # tanh, sin, swish, relu, gelu
-    output_activation: Optional[str] = None
-    initialization: str = "xavier_normal"  # xavier_normal, xavier_uniform, he_normal, he_uniform
-    dropout: float = 0.0
-    batch_norm: bool = False
-    input_dim: int = 1
+    input_dim: int = 2
     output_dim: int = 1
+    hidden_layers: list = None
+    activation: str = "tanh"
+    initialization: str = "xavier_normal"
+    
+    def __post_init__(self):
+        if self.hidden_layers is None:
+            self.hidden_layers = [64, 64, 64, 64]
 
 
 @dataclass
 class TrainingConfig:
-    """Training configuration."""
     epochs: int = 10000
-    batch_size: int = 1024
     learning_rate: float = 1e-3
-    optimizer: str = "adam"  # adam, adamw, lbfgs
-    scheduler: str = "step"  # step, cosine, plateau, none
-    scheduler_params: Dict[str, Any] = field(default_factory=dict)
+    optimizer: str = "adam"
+    scheduler: str = "cosine"
     gradient_clip: float = 1.0
     early_stopping_patience: int = 1000
-    early_stopping_min_delta: float = 1e-6
-    loss_weights: Dict[str, float] = field(default_factory=lambda: {
-        "physics": 1.0,
-        "boundary": 1.0,
-        "initial": 1.0,
-        "data": 1.0,
-    })
 
 
 @dataclass
 class SamplingConfig:
-    """Collocation and boundary point sampling configuration."""
     n_collocation: int = 10000
     n_boundary: int = 1000
     n_initial: int = 1000
-    n_data: int = 0
-    sampling_strategy: str = "uniform"  # uniform, latin_hypercube, sobol, adaptive
-    domain: Dict[str, List[float]] = field(default_factory=dict)
-    adaptive_sampling: bool = False
-    adaptive_frequency: int = 1000
-    adaptive_top_k: int = 1000
+    strategy: str = "lhs"
 
 
 @dataclass
 class EquationConfig:
-    """PDE/ODE equation parameters."""
-    equation_type: str = "heat"  # heat, burgers, wave, poisson, reaction_diffusion, ode
-    parameters: Dict[str, float] = field(default_factory=dict)
-    domain: Dict[str, List[float]] = field(default_factory=dict)
-    boundary_conditions: Dict[str, Any] = field(default_factory=dict)
-    initial_condition: Dict[str, Any] = field(default_factory=dict)
-    analytical_solution: Optional[str] = None
+    equation_type: str = "heat_1d"
+    parameters: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        if self.parameters is None:
+            self.parameters = {}
+
+
+@dataclass
+class LossWeights:
+    physics: float = 1.0
+    boundary: float = 10.0
+    initial: float = 10.0
+    data: float = 1.0
 
 
 @dataclass
 class LoggingConfig:
-    """Logging and visualization configuration."""
     log_dir: str = "logs"
-    log_interval: int = 100
-    plot_interval: int = 500
-    save_interval: int = 1000
+    log_freq: int = 100
     use_wandb: bool = False
-    wandb_project: str = "pinns-journey"
-    wandb_entity: Optional[str] = None
-    save_best_only: bool = True
+    project_name: str = "pinns-journey"
 
 
 @dataclass
-class ExperimentConfig:
-    """Full experiment configuration."""
-    name: str = "pinn_experiment"
-    seed: int = 42
-    device: str = "auto"  # auto, cpu, cuda, mps
-    model: ModelConfig = field(default_factory=ModelConfig)
-    training: TrainingConfig = field(default_factory=TrainingConfig)
-    sampling: SamplingConfig = field(default_factory=SamplingConfig)
-    equation: EquationConfig = field(default_factory=EquationConfig)
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
-
-
 class Config:
-    """
-    Configuration manager with validation and merging capabilities.
+    name: str = "experiment"
+    seed: int = 42
+    device: str = "auto"
+    model: ModelConfig = None
+    training: TrainingConfig = None
+    sampling: SamplingConfig = None
+    equation: EquationConfig = None
+    loss_weights: LossWeights = None
+    logging: LoggingConfig = None
     
-    Example:
-        >>> config = Config.from_yaml("configs/heat_equation.yaml")
-        >>> config.model.hidden_layers = [128, 128, 128]
-        >>> config.save("configs/modified.yaml")
-    """
-    
-    def __init__(self, config: Optional[ExperimentConfig] = None):
-        self._config = config or ExperimentConfig()
-    
-    @property
-    def model(self) -> ModelConfig:
-        return self._config.model
-    
-    @property
-    def training(self) -> TrainingConfig:
-        return self._config.training
-    
-    @property
-    def sampling(self) -> SamplingConfig:
-        return self._config.sampling
-    
-    @property
-    def equation(self) -> EquationConfig:
-        return self._config.equation
-    
-    @property
-    def logging(self) -> LoggingConfig:
-        return self._config.logging
-    
-    @property
-    def seed(self) -> int:
-        return self._config.seed
-    
-    @property
-    def device(self) -> str:
-        return self._config.device
-    
-    @property
-    def name(self) -> str:
-        return self._config.name
+    def __post_init__(self):
+        if self.model is None:
+            self.model = ModelConfig()
+        if self.training is None:
+            self.training = TrainingConfig()
+        if self.sampling is None:
+            self.sampling = SamplingConfig()
+        if self.equation is None:
+            self.equation = EquationConfig()
+        if self.loss_weights is None:
+            self.loss_weights = LossWeights()
+        if self.logging is None:
+            self.logging = LoggingConfig()
     
     @classmethod
-    def from_yaml(cls, path: Union[str, Path]) -> "Config":
+    def from_yaml(cls, path: str) -> "Config":
         """Load configuration from YAML file."""
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"Config file not found: {path}")
+        with open(path, 'r') as f:
+            data = yaml.safe_load(f)
         
-        with open(path, "r") as f:
-            raw_config = OmegaConf.load(f)
-        
-        # Convert to structured config with defaults
-        structured = OmegaConf.structured(ExperimentConfig)
-        merged = OmegaConf.merge(structured, raw_config)
-        config = OmegaConf.to_object(merged)
-        
-        return cls(config)
+        return cls._from_dict(data)
     
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":
+    def from_dict(cls, data: Dict[str, Any]) -> "Config":
         """Create config from dictionary."""
-        structured = OmegaConf.structured(ExperimentConfig)
-        merged = OmegaConf.merge(structured, config_dict)
-        config = OmegaConf.to_object(merged)
-        return cls(config)
+        return cls._from_dict(data)
+    
+    @classmethod
+    def _from_dict(cls, data: Dict[str, Any]) -> "Config":
+        # Handle nested dataclasses
+        kwargs = {}
+        for field in fields(cls):
+            field_name = field.name
+            if field_name in data:
+                value = data[field_name]
+                if isinstance(value, dict) and hasattr(field.type, '__origin__'):
+                    # Handle nested dataclasses
+                    if field_name == 'model':
+                        kwargs[field_name] = ModelConfig(**value)
+                    elif field_name == 'training':
+                        kwargs[field_name] = TrainingConfig(**value)
+                    elif field_name == 'sampling':
+                        kwargs[field_name] = SamplingConfig(**value)
+                    elif field_name == 'equation':
+                        kwargs[field_name] = EquationConfig(**value)
+                    elif field_name == 'loss_weights':
+                        kwargs[field_name] = LossWeights(**value)
+                    elif field_name == 'logging':
+                        kwargs[field_name] = LoggingConfig(**value)
+                    else:
+                        kwargs[field_name] = value
+                else:
+                    kwargs[field_name] = value
+        return cls(**kwargs)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        return OmegaConf.to_container(OmegaConf.structured(self._config), resolve=True)
+        return asdict(self)
     
-    def to_yaml(self, path: Union[str, Path]) -> None:
-        """Save configuration to YAML file."""
+    def to_yaml(self, path: str) -> None:
+        """Save to YAML file."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        OmegaConf.save(config=OmegaConf.structured(self._config), f=path)
-    
-    def update(self, updates: Dict[str, Any]) -> None:
-        """Update configuration with new values."""
-        current = self.to_dict()
-        self._deep_update(current, updates)
-        self._config = OmegaConf.to_object(OmegaConf.merge(
-            OmegaConf.structured(ExperimentConfig), current
-        ))
-    
-    def _deep_update(self, base: Dict, updates: Dict) -> None:
-        """Recursively update nested dictionary."""
-        for key, value in updates.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                self._deep_update(base[key], value)
-            else:
-                base[key] = value
-    
-    def __repr__(self) -> str:
-        return OmegaConf.to_yaml(OmegaConf.structured(self._config))
+        with open(path, 'w') as f:
+            yaml.dump(self.to_dict(), f, default_flow_style=False)
 
 
-def load_config(path: Union[str, Path]) -> Config:
-    """Convenience function to load configuration."""
-    return Config.from_yaml(path)
-
-
-def create_default_configs(output_dir: Union[str, Path] = "configs") -> None:
+def create_default_configs(output_dir: str = "configs"):
     """Create default configuration files for each equation type."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
     
-    # Default ODE config
-    ode_config = Config()
-    ode_config._config.name = "ode_exponential_decay"
-    ode_config._config.equation.equation_type = "ode"
-    ode_config._config.equation.parameters = {"decay_rate": 1.0}
-    ode_config._config.equation.domain = {"x": [0.0, 2.0]}
-    ode_config._config.equation.initial_condition = {"x": 0.0, "y": 1.0}
-    ode_config._config.equation.analytical_solution = "exp(-x)"
-    ode_config.to_yaml(output_dir / "ode_exponential_decay.yaml")
+    # Heat equation
+    heat = Config(
+        name="heat_1d",
+        equation=EquationConfig(
+            equation_type="heat_1d",
+            parameters={"alpha": 0.01}
+        ),
+        loss_weights=LossWeights(physics=1.0, boundary=10.0, initial=10.0),
+        sampling=SamplingConfig(n_collocation=10000, n_boundary=1000, n_initial=1000)
+    )
+    heat.to_yaml(output / "heat_1d.yaml")
     
-    # Default Heat Equation config
-    heat_config = Config()
-    heat_config._config.name = "heat_equation_1d"
-    heat_config._config.equation.equation_type = "heat"
-    heat_config._config.equation.parameters = {"alpha": 0.01}
-    heat_config._config.equation.domain = {"x": [0.0, 1.0], "t": [0.0, 1.0]}
-    heat_config._config.equation.boundary_conditions = {
-        "left": {"type": "dirichlet", "value": 0.0},
-        "right": {"type": "dirichlet", "value": 0.0},
-    }
-    heat_config._config.equation.initial_condition = {
-        "type": "sinusoidal",
-        "expression": "sin(pi * x)"
-    }
-    heat_config._config.equation.analytical_solution = "exp(-alpha * pi^2 * t) * sin(pi * x)"
-    heat_config.to_yaml(output_dir / "heat_equation_1d.yaml")
+    # Burgers equation
+    burgers = Config(
+        name="burgers_1d",
+        equation=EquationConfig(
+            equation_type="burgers_1d",
+            parameters={"nu": 0.01/3.14159}
+        ),
+        loss_weights=LossWeights(physics=1.0, boundary=10.0, initial=10.0),
+        model=ModelConfig(hidden_layers=[64, 64, 64, 64, 64]),
+    )
+    burgers.to_yaml(output / "burgers_1d.yaml")
     
-    # Default Burgers Equation config
-    burgers_config = Config()
-    burgers_config._config.name = "burgers_equation_1d"
-    burgers_config._config.equation.equation_type = "burgers"
-    burgers_config._config.equation.parameters = {"nu": 0.01 / 3.14159}
-    burgers_config._config.equation.domain = {"x": [-1.0, 1.0], "t": [0.0, 1.0]}
-    burgers_config._config.equation.boundary_conditions = {
-        "left": {"type": "dirichlet", "value": 0.0},
-        "right": {"type": "dirichlet", "value": 0.0},
-    }
-    burgers_config._config.equation.initial_condition = {
-        "type": "sinusoidal",
-        "expression": "-sin(pi * x)"
-    }
-    burgers_config._config.equation.analytical_solution = "exact_solution_available"
-    burgers_config.to_yaml(output_dir / "burgers_equation_1d.yaml")
+    # Wave equation
+    wave = Config(
+        name="wave_1d",
+        equation=EquationConfig(
+            equation_type="wave_1d",
+            parameters={"c": 1.0}
+        ),
+        loss_weights=LossWeights(physics=1.0, boundary=10.0, initial=10.0),
+    )
+    wave.to_yaml(output / "wave_1d.yaml")
     
-    print(f"Default configs created in {output_dir}/")
+    # Exponential decay ODE
+    decay = Config(
+        name="exponential_decay",
+        equation=EquationConfig(
+            equation_type="exponential_decay",
+            parameters={"decay_rate": 1.0}
+        ),
+        model=ModelConfig(input_dim=1, output_dim=1, hidden_layers=[32, 32, 32]),
+        loss_weights=LossWeights(physics=1.0, boundary=0.0, initial=1.0),
+        sampling=SamplingConfig(n_collocation=1000, n_boundary=0, n_initial=100),
+    )
+    decay.to_yaml(output / "exponential_decay.yaml")
+    
+    print(f"Default configs created in {output}/")
 
 
 if __name__ == "__main__":

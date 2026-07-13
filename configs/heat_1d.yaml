@@ -1,0 +1,44 @@
+name: "heat_1d_experiment"
+seed: 42
+device: "auto"
+
+model:
+  input_dim: 2
+  output_dim: 1
+  hidden_layers: [64, 64, 64, 64]
+  activation: "tanh"
+  initialization: "xavier_normal"
+  dropout: 0.0
+
+training:
+  epochs: 10000
+  learning_rate: 1e-3
+  optimizer: "adam"
+  scheduler: "cosine"
+  gradient_clip: 1.0
+  early_stopping_patience: 1000
+  early_stopping_min_delta: 1e-6
+
+sampling:
+  n_collocation: 10000
+  n_boundary: 1000
+  n_initial: 1000
+  strategy: "lhs"
+
+equation:
+  equation_type: "heat_1d"
+  parameters:
+    alpha: 0.01
+
+loss_weights:
+  physics: 1.0
+  boundary: 10.0
+  initial: 10.0
+
+logging:
+  log_dir: "logs"
+  log_freq: 100
+  plot_freq: 500
+  save_freq: 1000
+  use_wandb: false
+  wandb_project: "pinns-journey"

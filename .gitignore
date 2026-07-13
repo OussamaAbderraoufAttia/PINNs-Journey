@@ -1,4 +1,4 @@
-# Python
+# Files and directories to ignore
 __pycache__/
 *.py[cod]
 *$py.class
@@ -21,11 +21,13 @@ wheels/
 *.egg
 
 # Virtual environments
-venv/
+.env
+.venv
 env/
+venv/
 ENV/
-.venv/
-conda/
+env.bak/
+venv.bak/
 
 # IDE
 .vscode/
@@ -36,66 +38,27 @@ conda/
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb.html
 
-# Data
+# Data and outputs
+*.pt
+*.pth
 *.h5
 *.hdf5
-*.npz
-*.pkl
-*.pickle
 data/
-datasets/
-
-# Logs & Checkpoints
-logs/
+outputs/
 checkpoints/
+figures/*.png
+figures/*.pdf
+
+# Logs
 *.log
 wandb/
 runs/
-
-# Figures (generated)
-figures/
-*.png
-*.pdf
-*.svg
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
+# Project specific
+*.pdf  # In papers/ - keep references but ignore generated
 .env.local
-
-# IDE specific
-*.swp
-*.swo
-
-# Coverage
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# PyTest
-.pytest_cache/
-
-# Distribution
-dist/
-build/
-
-# Jupyter
-.ipynb_checkpoints
-
-# MkDocs
-site/
-
-# IDE
-.vscode/
-.idea/

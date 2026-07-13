@@ -317,13 +317,6 @@ class HeatEquation2D(HeatEquation):
         }
 
 
-# Register equations
-from ..registry import register_equation
-register_equation("heat", HeatEquation)
-register_equation("heat_1d", HeatEquation1D)
-register_equation("heat_2d", HeatEquation2D)
-
-
 __all__ = [
     "HeatEquation",
     "HeatEquation1D",

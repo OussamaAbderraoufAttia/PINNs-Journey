@@ -1,5 +1,5 @@
 """
-Loss Package
+Losses Package
 
 Physics-informed loss functions for PINNs.
 """
@@ -20,7 +20,7 @@ from .physics import (
 
 __all__ = [
     "LossType",
-    "LossWeights",
+    "LossWeights", 
     "LossComponent",
     "PhysicsLoss",
     "BoundaryLoss",

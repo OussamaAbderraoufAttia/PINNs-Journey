@@ -198,12 +198,6 @@ class PoissonEquation2D(PoissonEquation):
         raise NotImplementedError("Poisson equation is steady-state; use sample_domain")
 
 
-from ..registry import register_equation
-register_equation("poisson", PoissonEquation)
-register_equation("poisson_1d", PoissonEquation1D)
-register_equation("poisson_2d", PoissonEquation2D)
-
-
 __all__ = [
     "PoissonEquation",
     "PoissonEquation1D",

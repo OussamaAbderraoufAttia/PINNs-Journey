@@ -1,0 +1,34 @@
+name: "ode_exponential_decay"
+seed: 42
+device: "auto"
+
+model:
+  input_dim: 1
+  output_dim: 1
+  hidden_layers: [32, 32, 32]
+  activation: "tanh"
+  initialization: "xavier_normal"
+
+training:
+  epochs: 5000
+  learning_rate: 1e-3
+  optimizer: "adam"
+  scheduler: "none"
+  gradient_clip: 1.0
+
+sampling:
+  n_collocation: 1000
+  strategy: "uniform"
+
+equation:
+  equation_type: "exponential_decay"
+  parameters:
+    decay_rate: 1.0
+
+loss_weights:
+  physics: 1.0
+  initial: 1.0
+
+logging:
+  log_dir: "logs"
+  log_freq: 100

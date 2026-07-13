@@ -7,6 +7,7 @@ Common forms:
 - Fisher-KPP: u_t = D u_xx + r u (1 - u)
 - Allen-Cahn: u_t = D u_xx + u - u³
 - Gray-Scott: u_t = D₁ u_xx - u v² + F(1-u)
+              v_t = D₂ v_xx + u v² - (F+k)v
 """
 
 import torch
@@ -36,19 +37,12 @@ class ReactionDiffusionEquation(PDE):
         self.reaction_term = reaction_term or (lambda u: u * (1 - u))  # Fisher-KPP
     
     def residual(self, model: callable, coords: Dict[str, Tensor]) -> Tensor:
-        raise NotImplementedError("Use specific dimension class")
-    
-    def analytical_solution(self, coords: Dict[str, Tensor]) -> Optional[Tensor]:
-        return None
+        raise NotImplementedError("Use ReactionDiffusion1D or 2D")
 
 
 class ReactionDiffusion1D(ReactionDiffusionEquation):
     """
     1D Reaction-Diffusion: u_t = D u_xx + f(u)
-    
-    Examples:
-    - Fisher-KPP: f(u) = r u (1 - u)
-    - Allen-Cahn: f(u) = u - u³
     """
     
     def __init__(
@@ -72,32 +66,28 @@ class ReactionDiffusion1D(ReactionDiffusionEquation):
             ]
         
         if initial_conditions is None:
-            # Gaussian pulse
             initial_conditions = [
-                InitialCondition(
-                    {"t": t_min},
-                    lambda x: torch.exp(-100 * (x - 0.5)**2)
-                )
+                InitialCondition({"t": t_min}, lambda x: torch.exp(-100 * (x - 0.5)**2))
             ]
         
         # Define reaction term
         if reaction_type == "fisher_kpp":
-            reaction_term = lambda u: r * u * (1 - u)
+            reaction = lambda u: r * u * (1 - u)
         elif reaction_type == "allen_cahn":
-            reaction_term = lambda u: u - u**3
+            reaction = lambda u: u - u**3
         elif reaction_type == "bistable":
-            reaction_term = lambda u: u * (1 - u) * (u - 0.5)
+            reaction = lambda u: u * (1 - u) * (u - 0.5)
         else:
-            reaction_term = lambda u: u * (1 - u)
+            reaction = lambda u: u * (1 - u)
         
-        super().__init__(domain, D, reaction_term, boundary_conditions, initial_conditions)
+        super().__init__(domain, D, reaction, boundary_conditions, initial_conditions)
         self.reaction_type = reaction_type
         self.r = r
         self.x_min, self.x_max = x_min, x_max
         self.t_min, self.t_max = t_min, t_max
     
     def residual(self, model: callable, coords: Dict[str, Tensor]) -> Tensor:
-        """Compute residual: u_t - D u_xx - f(u) = 0"""
+        """Compute reaction-diffusion residual: u_t - D u_xx - f(u) = 0"""
         x = torch.cat([coords['x'], coords['t']], dim=-1)
         u = model(x)
         
@@ -106,7 +96,7 @@ class ReactionDiffusion1D(ReactionDiffusionEquation):
             u.sum(), coords['t'], create_graph=True, retain_graph=True
         )[0]
         
-        # Spatial second derivative
+        # Spatial derivatives
         u_x = torch.autograd.grad(
             u.sum(), coords['x'], create_graph=True, retain_graph=True
         )[0]
@@ -120,6 +110,10 @@ class ReactionDiffusion1D(ReactionDiffusionEquation):
         # Residual
         residual = u_t - self.D * u_xx - f_u
         return residual
+    
+    def analytical_solution(self, coords: Dict[str, Tensor]) -> Optional[Tensor]:
+        """No general analytical solution."""
+        return None
     
     def sample_boundary(self, n_per_boundary: int) -> Dict[str, Tensor]:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -187,19 +181,21 @@ class ReactionDiffusion2D(ReactionDiffusionEquation):
             ]
         
         if reaction_type == "fisher_kpp":
-            reaction_term = lambda u: r * u * (1 - u)
+            reaction = lambda u: r * u * (1 - u)
         elif reaction_type == "allen_cahn":
-            reaction_term = lambda u: u - u**3
+            reaction = lambda u: u - u**3
         else:
-            reaction_term = lambda u: u * (1 - u)
+            reaction = lambda u: u * (1 - u)
         
-        super().__init__(domain, D, reaction_term, boundary_conditions, initial_conditions)
+        super().__init__(domain, D, reaction, boundary_conditions, initial_conditions)
+        self.reaction_type = reaction_type
+        self.r = r
         self.x_min, self.x_max = x_min, x_max
         self.y_min, self.y_max = y_min, y_max
         self.t_min, self.t_max = t_min, t_max
     
     def residual(self, model: callable, coords: Dict[str, Tensor]) -> Tensor:
-        """Compute 2D reaction-diffusion residual"""
+        """Compute 2D reaction-diffusion residual."""
         x = torch.cat([coords['x'], coords['y'], coords['t']], dim=-1)
         u = model(x)
         
@@ -223,6 +219,9 @@ class ReactionDiffusion2D(ReactionDiffusionEquation):
         
         residual = u_t - self.D * laplacian - f_u
         return residual
+    
+    def analytical_solution(self, coords: Dict[str, Tensor]) -> Optional[Tensor]:
+        return None
     
     def sample_boundary(self, n_per_boundary: int) -> Dict[str, Tensor]:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -272,12 +271,6 @@ class ReactionDiffusion2D(ReactionDiffusionEquation):
             "y": y.requires_grad_(True),
             "t": t.requires_grad_(True),
         }
-
-
-from ..registry import register_equation
-register_equation("reaction_diffusion", ReactionDiffusionEquation)
-register_equation("reaction_diffusion_1d", ReactionDiffusion1D)
-register_equation("reaction_diffusion_2d", ReactionDiffusion2D)
 
 
 __all__ = [

@@ -270,12 +270,6 @@ class WaveEquation2D(WaveEquation):
         }
 
 
-from ..registry import register_equation
-register_equation("wave", WaveEquation)
-register_equation("wave_1d", WaveEquation1D)
-register_equation("wave_2d", WaveEquation2D)
-
-
 __all__ = [
     "WaveEquation",
     "WaveEquation1D",

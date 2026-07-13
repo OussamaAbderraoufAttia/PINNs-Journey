@@ -172,12 +172,6 @@ class BurgersEquation1D(BurgersEquation):
         return None
 
 
-# Register
-from ..registry import register_equation
-register_equation("burgers", BurgersEquation)
-register_equation("burgers_1d", BurgersEquation1D)
-
-
 __all__ = [
     "BurgersEquation",
     "BurgersEquation1D",
