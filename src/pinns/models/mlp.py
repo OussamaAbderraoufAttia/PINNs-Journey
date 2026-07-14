@@ -128,9 +128,9 @@ class MLP(nn.Module):
     ):
         super().__init__()
         
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.hidden_dims = hidden_dims
+        self._input_dim = input_dim
+        self._output_dim = output_dim
+        self._hidden_dims = hidden_dims
         self.activation_name = activation if isinstance(activation, str) else activation.value
         self.use_residual = use_residual
         self.input_scale = input_scale
@@ -174,10 +174,6 @@ class MLP(nn.Module):
         
         # Store input dimension for graph logging
         self.register_buffer("input_dim_buffer", torch.tensor(input_dim))
-    
-    @property
-    def input_dim(self) -> int:
-        return self.input_dim_buffer.item()
     
     def _init_weights(self, module: nn.Module, init_type: str) -> None:
         """Initialize weights according to scheme."""
@@ -284,9 +280,9 @@ class FourierFeatureMLP(nn.Module):
     ):
         super().__init__()
         
-        self.input_dim = input_dim
-        self.mapping_size = mapping_size
-        self.sigma = sigma
+        self._input_dim = input_dim
+        self._mapping_size = mapping_size
+        self._sigma = sigma
         
         # Random Fourier feature mapping (fixed, not learned)
         self.register_buffer(
